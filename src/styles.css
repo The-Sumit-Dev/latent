@@ -3,15 +3,15 @@
 @import "tw-animate-css";
 @import "plyr/dist/plyr.css";
 
-/* Plyr Custom Theme Styling */
+/* Exact Plyr.io Theme Styling */
 :root {
-  --plyr-color-main: #7c5cfc;
+  --plyr-color-main: #00b3ff;
   --plyr-video-background: #000000;
-  --plyr-menu-background: #12121a;
+  --plyr-menu-background: rgba(26, 26, 38, 0.95);
   --plyr-menu-color: #e8e8f0;
-  --plyr-menu-border-color: #2a2a42;
-  --plyr-badge-border-color: #2a2a42;
-  --plyr-control-radius: 8px;
+  --plyr-menu-border-color: rgba(255, 255, 255, 0.1);
+  --plyr-badge-border-color: rgba(255, 255, 255, 0.1);
+  --plyr-control-radius: 4px;
 }
 
 .plyr-wrap {

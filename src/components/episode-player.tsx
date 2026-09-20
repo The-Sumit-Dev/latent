@@ -163,13 +163,13 @@ export function EpisodePlayer({
           controls: [
             "play-large",
             "play",
-            "progress",
-            "current-time",
-            "duration",
             "mute",
             "volume",
+            "current-time",
+            "progress",
             "settings",
             "pip",
+            "airplay",
             "fullscreen",
           ],
         });
