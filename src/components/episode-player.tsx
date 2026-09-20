@@ -65,7 +65,7 @@ export function EpisodePlayer({
   thumbnail?: string | undefined;
   autoPlay?: boolean;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const mountRef = useRef<HTMLDivElement>(null);
   const plyrInstanceRef = useRef<any>(null);
 
   const [mini, setMini] = useState(false);
@@ -134,49 +134,146 @@ export function EpisodePlayer({
     };
   }, [okcdnId, videoId]);
 
-  // Instantiate Plyr video player safely on client-side
+  // Instantiate Plyr video player inside pure DOM mountRef to prevent React DOM crashes
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !mountRef.current) return;
     let cancelled = false;
 
     loadPlyrScript().then((PlyrClass) => {
-      if (cancelled || !PlyrClass) return;
+      if (cancelled || !mountRef.current) return;
 
       if (plyrInstanceRef.current) {
         try {
           plyrInstanceRef.current.destroy();
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) {}
         plyrInstanceRef.current = null;
       }
 
-      const videoEl = containerRef.current?.querySelector("#plyr-video");
-      if (!videoEl) return;
+      const container = mountRef.current;
+      container.innerHTML = "";
 
-      try {
-        const instance = new PlyrClass(videoEl, {
+      // Custom controls HTML matching exact user spec:
+      // Row 1: Timeline progress scrubber bar + duration time right side in 1 line
+      // Row 2: Left: Play/Pause + Mute/Volume | Right: Settings, Zoom/Fullscreen, Copy Link, PiP
+      const controlsHTML = `
+        <div class="plyr__controls" style="flex-wrap: wrap; padding: 10px 14px; gap: 6px;">
+          <!-- Row 1: Timeline bar + time display in 1 line -->
+          <div style="width: 100%; display: flex; align-items: center; gap: 10px;">
+            <div class="plyr__progress" style="flex: 1;">
+              <input data-plyr="seek" type="range" min="0" max="100" step="0.1" value="0" aria-label="Seek">
+              <progress class="plyr__progress__buffer" min="0" max="100" value="0">% buffered</progress>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #ffffff;">
+              <span class="plyr__time plyr__time--current" aria-label="Current time">00:00</span>
+              <span>/</span>
+              <span class="plyr__time plyr__time--duration" aria-label="Duration">00:00</span>
+            </div>
+          </div>
+          <!-- Row 2: Left: Play/Pause, Volume | Right: Settings, Zoom, Copy Link, PIP -->
+          <div style="width: 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="plyr__controls__item plyr__control" data-plyr="play" aria-label="Play">
+                <svg class="icon-play" aria-hidden="true"><use xlink:href="#plyr-play"></use></svg>
+                <svg class="icon-pause" aria-hidden="true"><use xlink:href="#plyr-pause"></use></svg>
+                <span class="plyr__sr-only">Play</span>
+              </button>
+              <button type="button" class="plyr__controls__item plyr__control" data-plyr="mute" aria-label="Mute">
+                <svg class="icon-muted" aria-hidden="true"><use xlink:href="#plyr-muted"></use></svg>
+                <svg class="icon-volume" aria-hidden="true"><use xlink:href="#plyr-volume"></use></svg>
+                <span class="plyr__sr-only">Mute</span>
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="plyr__controls__item plyr__control" data-plyr="settings" aria-label="Settings">
+                <svg aria-hidden="true"><use xlink:href="#plyr-settings"></use></svg>
+                <span class="plyr__sr-only">Settings</span>
+              </button>
+              <button type="button" class="plyr__controls__item plyr__control" data-plyr="fullscreen" aria-label="Fullscreen">
+                <svg class="icon-fullscreen-enter" aria-hidden="true"><use xlink:href="#plyr-enter-fullscreen"></use></svg>
+                <svg class="icon-fullscreen-exit" aria-hidden="true"><use xlink:href="#plyr-exit-fullscreen"></use></svg>
+                <span class="plyr__sr-only">Zoom / Fullscreen</span>
+              </button>
+              <button type="button" class="plyr__controls__item plyr__control" id="custom-copy-link-btn" aria-label="Copy Link" title="Copy Video Stream Link">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                <span class="plyr__sr-only">Copy Link</span>
+              </button>
+              <button type="button" class="plyr__controls__item plyr__control" data-plyr="pip" aria-label="PIP">
+                <svg aria-hidden="true"><use xlink:href="#plyr-pip"></use></svg>
+                <span class="plyr__sr-only">PIP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (okcdnId && okStreams.length > 0) {
+        const wrap = document.createElement("div");
+        wrap.className = "plyr-wrap h-full w-full relative";
+        wrap.id = "plyr-wrap";
+
+        const video = document.createElement("video");
+        video.id = "plyr-video";
+        video.className = "plyr-video h-full w-full object-contain";
+        video.setAttribute("playsinline", "");
+        video.setAttribute("controls", "");
+        if (thumbnail) video.setAttribute("poster", thumbnail);
+
+        okStreams.forEach((s) => {
+          let size = 720;
+          const m = s.type?.match(/(\d+)p/);
+          if (m?.[1]) size = parseInt(m[1], 10);
+          const source = document.createElement("source");
+          source.src = s.url;
+          source.type = "video/mp4";
+          source.setAttribute("size", String(size));
+          video.appendChild(source);
+        });
+
+        wrap.appendChild(video);
+        container.appendChild(wrap);
+        video.load();
+
+        const plyr = new PlyrClass(video, {
           autoplay: autoPlay,
           quality: { default: 480, options: [1080, 720, 480, 360, 240, 144] },
           speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
           fullscreen: { enabled: true, fallback: true, iosNative: true },
-          controls: [
-            "play-large",
-            "play",
-            "mute",
-            "volume",
-            "current-time",
-            "progress",
-            "settings",
-            "pip",
-            "airplay",
-            "fullscreen",
-          ],
+          controls: controlsHTML,
         });
-        plyrInstanceRef.current = instance;
-      } catch (err) {
-        console.error("Plyr initialization error:", err);
+
+        plyrInstanceRef.current = plyr;
+      } else if (videoId) {
+        const wrap = document.createElement("div");
+        wrap.className = "plyr-wrap h-full w-full relative";
+        wrap.id = "plyr-wrap";
+
+        const ytDiv = document.createElement("div");
+        ytDiv.id = "plyr-video";
+        ytDiv.setAttribute("data-plyr-provider", "youtube");
+        ytDiv.setAttribute("data-plyr-embed-id", videoId);
+
+        wrap.appendChild(ytDiv);
+        container.appendChild(wrap);
+
+        const plyr = new PlyrClass(ytDiv, {
+          autoplay: autoPlay,
+          speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+          fullscreen: { enabled: true, fallback: true, iosNative: true },
+          controls: controlsHTML,
+        });
+
+        plyrInstanceRef.current = plyr;
       }
+
+      // Attach copy link listener to custom copy button inside plyr controls
+      setTimeout(() => {
+        const copyBtn = container.querySelector("#custom-copy-link-btn");
+        if (copyBtn) {
+          copyBtn.addEventListener("click", () => {
+            setStreamModalOpen(true);
+          });
+        }
+      }, 300);
     });
 
     return () => {
@@ -188,7 +285,7 @@ export function EpisodePlayer({
         plyrInstanceRef.current = null;
       }
     };
-  }, [okcdnId, okStreams, videoId, autoPlay]);
+  }, [okcdnId, okStreams, videoId, autoPlay, thumbnail]);
 
   const closeStreamModal = () => {
     setStreamModalOpen(false);
@@ -216,7 +313,7 @@ export function EpisodePlayer({
 
     if (!streamUrl && okcdnId) {
       try {
-        const res = await fetch(`/api/stream?id=${encodeURIComponent(okcdnId)}`);
+        const res = await fetch(`/api/stream?id=${encodeURIComponent(okcdnId!)}`);
         const data = await res.json();
         if (data.status === "success" && Array.isArray(data.streams)) {
           const s = data.streams.find((item: any) => item.type === selectedQuality) || data.streams[0];
@@ -263,7 +360,7 @@ export function EpisodePlayer({
             : "relative overflow-hidden rounded-md bg-black shadow-2xl"
         }
       >
-        <div ref={containerRef} className="relative aspect-video w-full bg-black">
+        <div className="relative aspect-video w-full bg-black">
           {/* Top floating overlay controls */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between p-3 sm:p-4 bg-gradient-to-b from-black/70 to-transparent">
             {mini ? (
@@ -289,14 +386,6 @@ export function EpisodePlayer({
             <div className="pointer-events-auto flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setStreamModalOpen(true)}
-                title="Copy Video Link"
-                className="grid size-9 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-all hover:bg-black/80 hover:scale-105"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
                 onClick={() => setMini((prev) => !prev)}
                 title={mini ? "Exit Mini Player" : "Mini Player"}
                 className="grid size-9 place-items-center rounded-full bg-black/60 text-white backdrop-blur transition-all hover:bg-black/80 hover:scale-105"
@@ -306,39 +395,18 @@ export function EpisodePlayer({
             </div>
           </div>
 
-          {/* Plyr Container */}
-          <div className="plyr-wrap h-full w-full" id="plyr-wrap">
-            {okcdnId && okStreams.length > 0 ? (
-              <video
-                id="plyr-video"
-                className="plyr-video h-full w-full object-contain"
-                playsInline
-                controls
-                poster={thumbnail}
-              >
-                {okStreams.map((s) => {
-                  let size = 720;
-                  const m = s.type?.match(/(\d+)p/);
-                  if (m?.[1]) size = parseInt(m[1], 10);
-                  return <source key={s.url} src={s.url} type="video/mp4" {...({ size } as any)} />;
-                })}
-              </video>
-            ) : videoId ? (
-              <div
-                id="plyr-video"
-                data-plyr-provider="youtube"
-                data-plyr-embed-id={videoId}
-              />
-            ) : unavailable ? (
-              <div className="grid h-full w-full place-items-center bg-black p-6 text-center text-sm font-medium text-white/80">
-                ⚠️ Stream unavailable
-              </div>
-            ) : (
-              <div className="grid h-full w-full place-items-center bg-black">
-                <Loader2 className="h-8 w-8 animate-spin text-[#7c5cfc]" />
-              </div>
-            )}
-          </div>
+          {/* Plyr DOM Mount Container */}
+          <div ref={mountRef} className="h-full w-full" />
+
+          {unavailable ? (
+            <div className="absolute inset-0 z-30 grid place-items-center bg-black p-6 text-center text-sm font-medium text-white/80">
+              ⚠️ Stream unavailable
+            </div>
+          ) : !okcdnId && !videoId && !ready ? (
+            <div className="absolute inset-0 z-30 grid place-items-center bg-black">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00b3ff]" />
+            </div>
+          ) : null}
         </div>
       </div>
 
