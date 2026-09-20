@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { EpisodePlayer } from "@/components/episode-player";
@@ -38,6 +38,18 @@ export const Route = createFileRoute("/season-{$season}/$tab/$episode")({
     const seasonKey = seasonKeyFromSlug(params.season) || params.season;
     if (!seasonKey) throw notFound();
 
+    // Explicitly handle invalid or removed Season 2 Episode 08 -> redirect to Bonus tab Deepak Kalal episode (/season-2/bonus/04)
+    if (
+      (params.season === "2" || seasonKey === "Season 2") &&
+      params.tab === "episodes" &&
+      Number(params.episode) >= 8
+    ) {
+      throw redirect({
+        to: "/season-{$season}/$tab/$episode",
+        params: { season: "2", tab: "bonus", episode: "04" },
+      });
+    }
+
     const tab = params.tab as ContentTab;
     const list = getMergedSectionEpisodes(seasonKey, tab);
     if (list.length === 0) throw notFound();
@@ -45,7 +57,15 @@ export const Route = createFileRoute("/season-{$season}/$tab/$episode")({
     const rank = Number(params.episode);
     const index = list.length - rank;
     const episode = list[index];
-    if (!episode) throw notFound();
+    if (!episode) {
+      if (rank > list.length && list.length > 0) {
+        throw redirect({
+          to: "/season-{$season}/$tab/$episode",
+          params: { season: params.season, tab: params.tab, episode: episodeSlug(list.length) },
+        });
+      }
+      throw notFound();
+    }
 
     return { seasonKey, tab, list, episode, rank };
   },
