@@ -539,7 +539,14 @@ export function EpisodePlayer({
 
   const [copiedStreamUrl, setCopiedStreamUrl] = useState<string>("");
 
-  const handleCopyAndOpenLink = async () => {
+  const handleCopyOrOpenLink = async () => {
+    // If already copied, second tap opens link in a new tab
+    if (copiedLink && (copiedStreamUrl || currentStreamUrl)) {
+      const urlToOpen = copiedStreamUrl || currentStreamUrl;
+      window.open(urlToOpen, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     setIsFetchingLink(true);
     let targetStream = okStreams.find((s) => s.type === selectedQuality || s.type === QUALITY_LABELS[selectedQuality]) ?? okStreams[0];
     let streamUrl = targetStream?.url || currentStreamUrl;
@@ -573,9 +580,6 @@ export function EpisodePlayer({
     }
 
     setCopiedLink(true);
-
-    // Open video stream link in another tab to download video
-    window.open(streamUrl, "_blank", "noopener,noreferrer");
   };
 
   const applyQuality = (level: string) => {
@@ -1013,27 +1017,31 @@ export function EpisodePlayer({
               </div>
             </div>
 
-            {/* Single Copy Link & Open to Download Button */}
+            {/* Single Copy Link & Open Link Button */}
             <button
               type="button"
               disabled={isFetchingLink}
-              onClick={handleCopyAndOpenLink}
-              className="relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:opacity-75"
+              onClick={handleCopyOrOpenLink}
+              className={`relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl px-4 font-bold shadow-lg transition-all active:scale-95 disabled:opacity-75 ${
+                copiedLink
+                  ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                  : "bg-white text-black hover:brightness-110"
+              }`}
             >
               {isFetchingLink ? (
-                <span className="flex items-center gap-2 text-sm font-bold text-black">
-                  <Loader2 className="h-4 w-4 animate-spin text-black" />
+                <span className="flex items-center gap-2 text-sm font-bold">
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Fetching link...
                 </span>
               ) : copiedLink ? (
-                <span className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-800">
-                  <ExternalLink className="h-4 w-4 text-emerald-700 shrink-0" />
-                  <span>Open Link to Download Video ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})</span>
+                <span className="flex items-center gap-2 text-xs sm:text-sm font-bold">
+                  <ExternalLink className="h-4 w-4 shrink-0" />
+                  <span>Open Link ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-2 text-xs sm:text-sm font-bold text-black">
-                  <Copy className="h-4 w-4 text-black shrink-0" />
-                  <span>Copy Link & Open to Download ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})</span>
+                <span className="flex items-center gap-2 text-xs sm:text-sm font-bold">
+                  <Copy className="h-4 w-4 shrink-0" />
+                  <span>Copy Link ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})</span>
                 </span>
               )}
             </button>
@@ -1118,34 +1126,34 @@ function ShakaSettingsMenu({
 }) {
   return (
     <div
-      className={`absolute bottom-11 right-0 z-50 w-[190px] sm:w-52 max-w-[calc(100vw-2rem)] origin-bottom-right overflow-hidden rounded-2xl border border-white/15 bg-[#0e0e13]/95 text-white shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl transition-all duration-200 ease-out ${
+      className={`absolute bottom-11 right-0 z-50 w-[165px] sm:w-[180px] max-w-[calc(100vw-1.5rem)] origin-bottom-right overflow-hidden rounded-xl border border-[#2a2a42] bg-[#12121a] text-[#e8e8f0] shadow-[0_8px_32px_rgba(0,0,0,0.8)] backdrop-blur-md transition-all duration-200 ease-out ${
         open
           ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
-          : "pointer-events-none translate-y-3 scale-95 opacity-0"
+          : "pointer-events-none translate-y-2 scale-95 opacity-0"
       }`}
       aria-hidden={!open}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] sm:text-xs">
+      <div className="flex items-center justify-between border-b border-[#2a2a42] bg-[#1a1a26]/60 px-3 py-2 text-[11px] font-bold text-white">
         {view === "root" ? (
           <div className="flex items-center gap-1.5">
-            <Sliders className="h-3.5 w-3.5 text-primary" />
-            <span className="font-bold uppercase tracking-wider text-white">Settings</span>
+            <Sliders className="h-3.5 w-3.5 text-[#7c5cfc]" />
+            <span className="uppercase tracking-wider">Settings</span>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setView("root")}
-            className="flex items-center gap-1 font-semibold text-white/90 transition-colors hover:text-white"
+            className="flex items-center gap-1 font-semibold text-[#7c5cfc] transition-colors hover:text-[#9d82ff]"
           >
-            <ChevronLeft className="h-3.5 w-3.5 text-primary" />
+            <ChevronLeft className="h-3.5 w-3.5" />
             <span className="truncate">{view === "quality" ? "Quality" : "Speed"}</span>
           </button>
         )}
         <button
           type="button"
           onClick={onClose}
-          className="grid size-5 place-items-center rounded-full bg-white/5 text-white/60 transition-colors hover:bg-white/15 hover:text-white"
+          className="grid size-5 place-items-center rounded-full text-[#8888aa] transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Close settings"
         >
           <X className="h-3 w-3" />
@@ -1153,27 +1161,27 @@ function ShakaSettingsMenu({
       </div>
 
       {/* Body Views */}
-      <div ref={panelRef} className="p-1 hide-scrollbar max-h-[min(13rem,42vh)] overflow-y-auto">
+      <div ref={panelRef} className="p-1 hide-scrollbar max-h-[min(13rem,45vh)] overflow-y-auto">
         {view === "root" && (
           <div key="root-menu" className="space-y-0.5 animate-fade-in">
             {/* Quality Row */}
             <button
               type="button"
               onClick={() => setView("quality")}
-              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[11px] sm:text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-medium text-[#e8e8f0] transition-colors hover:bg-[#1a1a26] active:scale-[0.98]"
             >
               <div className="flex items-center gap-2">
-                <Film className="h-3.5 w-3.5 text-white/70" />
+                <Film className="h-3.5 w-3.5 text-[#8888aa]" />
                 <span>Quality</span>
               </div>
-              <div className="flex items-center gap-1 text-white/60 font-semibold">
-                <span className="truncate max-w-[70px]">{QUALITY_LABELS[quality] ?? quality}</span>
+              <div className="flex items-center gap-1 text-[#8888aa] font-semibold">
+                <span className="truncate max-w-[65px]">{QUALITY_LABELS[quality] ?? quality}</span>
                 {HD_QUALITIES.has(quality) && (
-                  <span className="rounded bg-primary/30 px-1 py-0.2 text-[8px] font-bold text-primary-foreground">
+                  <span className="rounded bg-[#7c5cfc]/30 px-1 py-0.2 text-[8px] font-bold text-[#7c5cfc]">
                     HD
                   </span>
                 )}
-                <ChevronRight className="h-3 w-3 text-white/40" />
+                <ChevronRight className="h-3 w-3 text-[#8888aa]" />
               </div>
             </button>
 
@@ -1181,15 +1189,15 @@ function ShakaSettingsMenu({
             <button
               type="button"
               onClick={() => setView("speed")}
-              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[11px] sm:text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-[11px] font-medium text-[#e8e8f0] transition-colors hover:bg-[#1a1a26] active:scale-[0.98]"
             >
               <div className="flex items-center gap-2">
-                <Zap className="h-3.5 w-3.5 text-white/70" />
+                <Zap className="h-3.5 w-3.5 text-[#8888aa]" />
                 <span>Speed</span>
               </div>
-              <div className="flex items-center gap-1 text-white/60 font-semibold">
+              <div className="flex items-center gap-1 text-[#8888aa] font-semibold">
                 <span>{RATE_LABELS[rate] ?? `${rate}×`}</span>
-                <ChevronRight className="h-3 w-3 text-white/40" />
+                <ChevronRight className="h-3 w-3 text-[#8888aa]" />
               </div>
             </button>
           </div>
@@ -1208,20 +1216,20 @@ function ShakaSettingsMenu({
                     applyQuality(level);
                     onClose();
                   }}
-                  className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-[11px] sm:text-xs font-medium transition-all ${
+                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                     isSelected
-                      ? "bg-primary/25 text-white font-semibold ring-1 ring-primary/60"
-                      : "text-white/85 hover:bg-white/10 hover:text-white"
+                      ? "bg-[#7c5cfc]/20 text-white font-semibold border border-[#7c5cfc]/40"
+                      : "text-[#e8e8f0] hover:bg-[#1a1a26] hover:text-white"
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="grid size-3.5 place-items-center">
-                      {isSelected ? <Check className="h-3 w-3 text-primary" /> : null}
+                      {isSelected ? <Check className="h-3 w-3 text-[#7c5cfc]" /> : null}
                     </span>
                     <span>{QUALITY_LABELS[level] ?? level}</span>
                   </div>
                   {isHd ? (
-                    <span className="rounded bg-primary/30 px-1 py-0.2 text-[8px] font-bold tracking-wider text-primary-foreground">
+                    <span className="rounded bg-[#7c5cfc]/30 px-1 py-0.2 text-[8px] font-bold text-[#7c5cfc]">
                       HD
                     </span>
                   ) : null}
@@ -1243,20 +1251,20 @@ function ShakaSettingsMenu({
                     applyRate(value);
                     onClose();
                   }}
-                  className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-[11px] sm:text-xs font-medium transition-all ${
+                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                     isSelected
-                      ? "bg-primary/25 text-white font-semibold ring-1 ring-primary/60"
-                      : "text-white/85 hover:bg-white/10 hover:text-white"
+                      ? "bg-[#7c5cfc]/20 text-white font-semibold border border-[#7c5cfc]/40"
+                      : "text-[#e8e8f0] hover:bg-[#1a1a26] hover:text-white"
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="grid size-3.5 place-items-center">
-                      {isSelected ? <Check className="h-3 w-3 text-primary" /> : null}
+                      {isSelected ? <Check className="h-3 w-3 text-[#7c5cfc]" /> : null}
                     </span>
                     <span>{RATE_LABELS[value] ?? `${value}×`}</span>
                   </div>
                   {value === 1 ? (
-                    <span className="text-[9px] font-medium text-white/40">Normal</span>
+                    <span className="text-[9px] font-medium text-[#8888aa]">Normal</span>
                   ) : null}
                 </button>
               );
