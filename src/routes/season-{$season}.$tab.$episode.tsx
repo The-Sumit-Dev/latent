@@ -79,16 +79,24 @@ function EpisodePage() {
   );
   const [browseTab, setBrowseTab] = useState<ContentTab>(tab);
 
+  const [updateTick, setUpdateTick] = useState(0);
+
   useEffect(() => {
     setBrowseSeason((seasonKey as keyof typeof LATENT_SEASONS) || "Season 2");
     setBrowseTab(tab);
   }, [seasonKey, tab]);
 
+  useEffect(() => {
+    const handleUpdate = () => setUpdateTick((t) => t + 1);
+    window.addEventListener("latent_episodes_updated", handleUpdate);
+    return () => window.removeEventListener("latent_episodes_updated", handleUpdate);
+  }, []);
+
   const browseTabs = SEASON_TABS[browseSeason];
   const activeBrowseTab: ContentTab = browseTabs.some((item) => item.value === browseTab)
     ? browseTab
     : (browseTabs[0]?.value ?? "episodes");
-  const list = getSectionEpisodes(browseSeason, activeBrowseTab);
+  const list = getMergedSectionEpisodes(browseSeason, activeBrowseTab);
 
   const cleanDisplayTitle = formatEpisodeTitle(episode);
 

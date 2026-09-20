@@ -184,19 +184,26 @@ export function getStoredScrapedEpisodes(): ScrapedEpisodeItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed: ScrapedEpisodeItem[] = raw ? JSON.parse(raw) : [];
-    return parsed
+    let wasModified = false;
+    const cleaned = parsed
       .map((ep) => {
         const t = (ep.title || "").toLowerCase();
         const id = (ep.id || "").toLowerCase();
         const okId = (ep.okcdnId || "").toLowerCase();
+        const g = (ep.guests || "").toLowerCase();
         let tab = ep.tab;
         if (
           t.includes("bonus") ||
+          t.includes("deepak kalal") ||
+          g.includes("deepak kalal") ||
           okId === "6aa68187d576db122c00226f" ||
           id.includes("bonus")
         ) {
           if (ep.season !== "Season 1" || !t.includes("deleted")) {
-            tab = "bonus";
+            if (tab !== "bonus") {
+              tab = "bonus";
+              wasModified = true;
+            }
           }
         }
         const formattedThumb = formatThumbnailUrl(ep.thumbnail);
@@ -229,6 +236,11 @@ export function getStoredScrapedEpisodes(): ScrapedEpisodeItem[] {
         }
         return true;
       });
+
+    if (wasModified) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return [];
   }

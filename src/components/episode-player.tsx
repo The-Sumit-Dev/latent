@@ -356,7 +356,7 @@ export function EpisodePlayer({
 
   const togglePlay = useCallback(() => {
     if (!started) setStarted(true);
-    if (okcdnId) {
+    if (okcdnId && currentStreamUrl) {
       const v = videoRef.current;
       if (!v) {
         setStarted(true);
@@ -365,8 +365,25 @@ export function EpisodePlayer({
         return;
       }
       if (v.paused) {
-        v.play().catch(() => {});
-        setPlaying(true);
+        v.play()
+          .then(() => {
+            setPlaying(true);
+            setBuffering(false);
+          })
+          .catch((err) => {
+            console.warn("Playback error, trying muted autoplay:", err);
+            v.muted = true;
+            setMuted(true);
+            v.play()
+              .then(() => {
+                setPlaying(true);
+                setBuffering(false);
+              })
+              .catch(() => {
+                setPlaying(false);
+                setBuffering(false);
+              });
+          });
       } else {
         v.pause();
         setPlaying(false);
@@ -385,7 +402,7 @@ export function EpisodePlayer({
     if (playing) player.pauseVideo();
     else player.playVideo();
     revealControls();
-  }, [started, okcdnId, playing, revealControls]);
+  }, [started, okcdnId, currentStreamUrl, playing, revealControls]);
 
   const skip = useCallback(
     (delta: number) => {
@@ -664,7 +681,6 @@ export function EpisodePlayer({
                 type="button"
                 aria-label={playing ? "Pause" : "Play"}
                 onClick={() => {
-                  if (loading || buffering) return;
                   if (settingsOpen) {
                     setSettingsOpen(false);
                     return;
