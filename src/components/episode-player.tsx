@@ -7,7 +7,6 @@ import {
   PictureInPicture2,
   X,
 } from "lucide-react";
-import Plyr from "plyr";
 import { useEffect, useRef, useState } from "react";
 import { getActiveClientProxyDomain } from "@/data/auto-updater";
 
@@ -32,6 +31,27 @@ const HD_QUALITIES = new Set(["1080p", "720p", "hd1080", "hd720"]);
 const DISALLOWED_QUALITIES = new Set(["2160p", "1440p", "hd2160", "hd1440", "highres", "4k", "2k"]);
 const DEFAULT_QUALITY = "480p";
 
+function loadPlyrScript(): Promise<any> {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if ((window as any).Plyr) return Promise.resolve((window as any).Plyr);
+
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-plyr-script="true"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve((window as any).Plyr));
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdn.plyr.io/3.7.8/plyr.js";
+    script.async = true;
+    script.dataset["plyrScript"] = "true";
+    script.onload = () => resolve((window as any).Plyr);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
 export function EpisodePlayer({
   videoId,
   okcdnId,
@@ -46,7 +66,7 @@ export function EpisodePlayer({
   autoPlay?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const plyrInstanceRef = useRef<Plyr | null>(null);
+  const plyrInstanceRef = useRef<any>(null);
 
   const [mini, setMini] = useState(false);
   const [ready, setReady] = useState(false);
@@ -114,44 +134,57 @@ export function EpisodePlayer({
     };
   }, [okcdnId, videoId]);
 
-  // Instantiate Plyr video player
+  // Instantiate Plyr video player safely on client-side
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!containerRef.current) return;
+    let cancelled = false;
 
-    // Destroy previous Plyr instance if any
-    if (plyrInstanceRef.current) {
-      plyrInstanceRef.current.destroy();
-      plyrInstanceRef.current = null;
-    }
+    loadPlyrScript().then((PlyrClass) => {
+      if (cancelled || !PlyrClass) return;
 
-    const videoEl = containerRef.current.querySelector("#plyr-video");
-    if (!videoEl) return;
+      if (plyrInstanceRef.current) {
+        try {
+          plyrInstanceRef.current.destroy();
+        } catch (e) {
+          console.error(e);
+        }
+        plyrInstanceRef.current = null;
+      }
 
-    const plyr = new Plyr(videoEl as HTMLElement, {
-      autoplay: autoPlay,
-      quality: { default: 480, options: [1080, 720, 480, 360, 240, 144] },
-      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
-      fullscreen: { enabled: true, fallback: true, iosNative: true },
-      controls: [
-        "play-large",
-        "play",
-        "progress",
-        "current-time",
-        "duration",
-        "mute",
-        "volume",
-        "settings",
-        "pip",
-        "fullscreen",
-      ],
+      const videoEl = containerRef.current?.querySelector("#plyr-video");
+      if (!videoEl) return;
+
+      try {
+        const instance = new PlyrClass(videoEl, {
+          autoplay: autoPlay,
+          quality: { default: 480, options: [1080, 720, 480, 360, 240, 144] },
+          speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+          fullscreen: { enabled: true, fallback: true, iosNative: true },
+          controls: [
+            "play-large",
+            "play",
+            "progress",
+            "current-time",
+            "duration",
+            "mute",
+            "volume",
+            "settings",
+            "pip",
+            "fullscreen",
+          ],
+        });
+        plyrInstanceRef.current = instance;
+      } catch (err) {
+        console.error("Plyr initialization error:", err);
+      }
     });
 
-    plyrInstanceRef.current = plyr;
-
     return () => {
+      cancelled = true;
       if (plyrInstanceRef.current) {
-        plyrInstanceRef.current.destroy();
+        try {
+          plyrInstanceRef.current.destroy();
+        } catch (e) {}
         plyrInstanceRef.current = null;
       }
     };
@@ -183,7 +216,7 @@ export function EpisodePlayer({
 
     if (!streamUrl && okcdnId) {
       try {
-        const res = await fetch(`/api/stream?id=${encodeURIComponent(okcdnId!)}`);
+        const res = await fetch(`/api/stream?id=${encodeURIComponent(okcdnId)}`);
         const data = await res.json();
         if (data.status === "success" && Array.isArray(data.streams)) {
           const s = data.streams.find((item: any) => item.type === selectedQuality) || data.streams[0];
@@ -274,7 +307,7 @@ export function EpisodePlayer({
           </div>
 
           {/* Plyr Container */}
-          <div className="plyr-wrap" id="plyr-wrap">
+          <div className="plyr-wrap h-full w-full" id="plyr-wrap">
             {okcdnId && okStreams.length > 0 ? (
               <video
                 id="plyr-video"
