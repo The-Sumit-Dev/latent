@@ -38,7 +38,7 @@ export const Route = createFileRoute("/season-{$season}/$tab/$episode")({
     const seasonKey = seasonKeyFromSlug(params.season) || params.season;
     if (!seasonKey) throw notFound();
 
-    // Explicitly handle invalid or removed Season 2 Episode 08 -> redirect to Bonus tab Deepak Kalal episode (/season-2/bonus/04)
+    // Explicitly handle invalid or removed Season 2 Episode 08 -> redirect to latest main episode (/season-2/episodes/07)
     if (
       (params.season === "2" || seasonKey === "Season 2") &&
       params.tab === "episodes" &&
@@ -46,7 +46,7 @@ export const Route = createFileRoute("/season-{$season}/$tab/$episode")({
     ) {
       throw redirect({
         to: "/season-{$season}/$tab/$episode",
-        params: { season: "2", tab: "bonus", episode: "04" },
+        params: { season: "2", tab: "episodes", episode: "07" },
       });
     }
 

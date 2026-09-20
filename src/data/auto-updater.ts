@@ -93,15 +93,26 @@ function formatDuration(rawDuration?: string): string {
   return cleaned || rawDuration;
 }
 
-/** Determine if a raw item should be ignored (e.g. standalone special shows) */
+/** Determine if a raw item should be ignored (e.g. standalone special shows or duplicate Varun Dhawan episode) */
 function isIgnoredItem(raw: any): boolean {
   if (!raw || typeof raw !== "object") return true;
   const dataId = (raw.dataId || "").toLowerCase();
   const title = (raw.title || "").toLowerCase();
+  const rawId = (raw.id || "").toLowerCase();
 
   // Exclude non-Latent standalone specials (Still Alive, Kapil, Documentary, etc.)
   if (dataId.includes("kapil") || dataId.includes("stillalive") || dataId.includes("still-alive")) return true;
   if (title.includes("mumbai documentary") || title.includes("talk show segment") || title.includes("still alive")) return true;
+
+  // STRICT RULE: Ignore Varun Dhawan episode (6a9ad189a0818f1f0a6267df) from auto-updater feed
+  if (
+    rawId === "6a9ad189a0818f1f0a6267df" ||
+    title.includes("varun dhawan") ||
+    title.includes("medha shankar") ||
+    title.includes("medha shankr")
+  ) {
+    return true;
+  }
 
   return false;
 }
@@ -217,7 +228,16 @@ export function getStoredScrapedEpisodes(): ScrapedEpisodeItem[] {
         const t = (ep.title || "").toLowerCase();
         const id = (ep.id || "").toLowerCase();
         const okId = (ep.okcdnId || "").toLowerCase();
-        const isIgnored = t.includes("still alive") || t.includes("kapil") || id.includes("stillalive");
+        const g = (ep.guests || "").toLowerCase();
+        const isIgnored =
+          t.includes("still alive") ||
+          t.includes("kapil") ||
+          id.includes("stillalive") ||
+          okId === "6a9ad189a0818f1f0a6267df" ||
+          t.includes("varun dhawan") ||
+          g.includes("varun dhawan") ||
+          t.includes("medha shankar") ||
+          t.includes("medha shankr");
         if (isIgnored) return false;
 
         // Remove S1 extra/deleted videos from Season 1 Bonus tab
@@ -335,18 +355,21 @@ export function getScrapedMergedEpisodes(
   let merged = [...uniqueScraped, ...staticList] as LatentEpisode[];
 
   if (tab === "episodes") {
-    // Strictly prevent bonus episodes or Varun Dhawan / Deepak Kalal bonus entries from showing up in main episodes tab
+    // Strictly prevent bonus episodes or Varun Dhawan / Deepak Kalal entries from showing up in main episodes tab
     merged = merged.filter((ep) => {
       const t = (ep.title || "").toLowerCase();
       const guests = (ep.guests || "").toLowerCase();
       const okId = (ep.okcdnId || "").toLowerCase();
-      const isBonusItem =
+      const isExcluded =
         okId === "6aa68187d576db122c00226f" ||
+        okId === "6a9ad189a0818f1f0a6267df" ||
         t.includes("deepak kalal") ||
-        (t.includes("varun dhawan") && !t.includes("episode 6")) ||
+        t.includes("varun dhawan") ||
+        guests.includes("varun dhawan") ||
+        t.includes("medha shankar") ||
         t.includes("s2 bonus") ||
         t.includes("bonus");
-      return !isBonusItem;
+      return !isExcluded;
     });
   } else if (tab === "bonus") {
     // Strictly prevent main Season 2 episodes (like Episode 6) from showing up in bonus tab

@@ -155,7 +155,7 @@ function Index() {
             <img
               src={heroDisplayThumb}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover object-top"
+              className="absolute inset-0 h-full w-full object-cover object-center"
             />
           )}
 
@@ -163,7 +163,7 @@ function Index() {
             <video
               ref={heroVideoRef}
               src={heroStreamUrl}
-              className={`absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-700 md:inset-auto md:left-1/2 md:top-1/2 md:h-[56.25vw] md:min-h-full md:w-[177.78vh] md:min-w-full md:-translate-x-1/2 md:-translate-y-1/2 ${
+              className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 md:inset-auto md:left-1/2 md:top-1/2 md:h-[56.25vw] md:min-h-full md:w-[177.78vh] md:min-w-full md:-translate-x-1/2 md:-translate-y-1/2 ${
                 heroPlaying ? "opacity-100" : "opacity-0"
               }`}
               autoPlay
