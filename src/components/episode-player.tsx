@@ -3,6 +3,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Film,
+  Loader2,
   Maximize,
   Minimize,
   Pause,
@@ -10,13 +13,13 @@ import {
   Play,
   RotateCcw,
   RotateCw,
-  Loader2,
   Settings,
+  Sliders,
   Volume2,
   VolumeX,
   X,
   XCircle,
-  Copy,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getActiveClientProxyDomain } from "@/data/auto-updater";
@@ -863,83 +866,30 @@ export function EpisodePlayer({
                 </div>
 
                 <div className="relative flex items-center gap-1 sm:gap-2">
-                  <div
-                    className={`absolute bottom-11 right-0 w-56 origin-bottom-right overflow-hidden rounded-xl border border-white/10 bg-black/85 text-left text-white shadow-2xl backdrop-blur-md transition-[opacity,transform] duration-200 ease-out ${
-                      settingsOpen
-                        ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
-                        : "pointer-events-none translate-y-2 scale-95 opacity-0"
-                    }`}
-                    aria-hidden={!settingsOpen}
-                  >
-                    <div
-                      className="hide-scrollbar max-h-[min(15rem,48vh)] overflow-y-auto transition-[height] duration-300 ease-out"
-                      style={{ height: panelHeight > 0 ? `${panelHeight}px` : undefined }}
-                    >
-                      <div ref={panelInnerRef}>
-                        {settingsView === "root" ? (
-                          <div key="root" className="animate-fade-in py-1">
-                            <SettingsRow
-                              label="Quality"
-                              value={QUALITY_LABELS[quality] ?? quality}
-                              onClick={() => setSettingsView("quality")}
-                            />
-                            <SettingsRow
-                              label="Speed"
-                              value={RATE_LABELS[rate] ?? `${rate}×`}
-                              onClick={() => setSettingsView("speed")}
-                            />
-                          </div>
-                        ) : null}
-
-                        {settingsView === "quality" ? (
-                          <div key="quality" className="animate-fade-in">
-                            <SettingsHeader label="Quality" onBack={() => setSettingsView("root")} />
-                            <div className="py-1">
-                              {qualityList.map((level) => (
-                                <OptionRow
-                                  key={level}
-                                  label={QUALITY_LABELS[level] ?? level}
-                                  {...(HD_QUALITIES.has(level) ? { badge: "HD" } : {})}
-                                  selected={quality === level}
-                                  onClick={() => {
-                                    applyQuality(level);
-                                    closeSettings();
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {settingsView === "speed" ? (
-                          <div key="speed" className="animate-fade-in">
-                            <SettingsHeader label="Speed" onBack={() => setSettingsView("root")} />
-                            <div className="py-1">
-                              {rates.map((value) => (
-                                <OptionRow
-                                  key={value}
-                                  label={RATE_LABELS[value] ?? `${value}×`}
-                                  selected={rate === value}
-                                  onClick={() => {
-                                    if (okcdnId && videoRef.current) {
-                                      videoRef.current.playbackRate = value;
-                                    } else {
-                                      playerRef.current?.setPlaybackRate?.(value);
-                                    }
-                                    setRate(value);
-                                    closeSettings();
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
+                  <ShakaSettingsMenu
+                    open={settingsOpen}
+                    view={settingsView}
+                    setView={setSettingsView}
+                    quality={quality}
+                    qualities={qualities}
+                    qualityList={qualityList}
+                    rate={rate}
+                    rates={rates}
+                    applyQuality={applyQuality}
+                    applyRate={(value) => {
+                      if (okcdnId && videoRef.current) {
+                        videoRef.current.playbackRate = value;
+                      } else {
+                        playerRef.current?.setPlaybackRate?.(value);
+                      }
+                      setRate(value);
+                    }}
+                    onClose={closeSettings}
+                    panelRef={panelInnerRef}
+                  />
 
                   <PlayerButton label="Playback settings" onClick={openSettings} active={settingsOpen}>
-                    <Settings className="h-4 w-4" />
+                    <Settings className={`h-4 w-4 transition-transform duration-300 ${settingsOpen ? "rotate-90 text-primary" : "group-hover:rotate-45"}`} />
                   </PlayerButton>
                   <PlayerButton
                     label="Copy video stream link"
@@ -1113,66 +1063,182 @@ function SkipButton({
   );
 }
 
-function SettingsRow({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-white/10"
-    >
-      <span className="font-medium">{label}</span>
-      <span className="flex items-center gap-1 text-white/70">
-        {value}
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-      </span>
-    </button>
-  );
-}
-
-function SettingsHeader({ label, onBack }: { label: string; onBack: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onBack}
-      className="flex w-full items-center gap-2 border-b border-white/10 px-3 py-2 text-[13px] font-semibold transition-colors hover:bg-white/10"
-    >
-      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-      {label}
-    </button>
-  );
-}
-
-function OptionRow({
-  label,
-  badge,
-  selected,
-  onClick,
+function ShakaSettingsMenu({
+  open,
+  view,
+  setView,
+  quality,
+  qualities,
+  qualityList,
+  rate,
+  rates,
+  applyQuality,
+  applyRate,
+  onClose,
+  panelRef,
 }: {
-  label: string;
-  badge?: string;
-  selected: boolean;
-  onClick: () => void;
+  open: boolean;
+  view: "root" | "quality" | "speed";
+  setView: (v: "root" | "quality" | "speed") => void;
+  quality: string;
+  qualities: string[];
+  qualityList: string[];
+  rate: number;
+  rates: number[];
+  applyQuality: (q: string) => void;
+  applyRate: (r: number) => void;
+  onClose: () => void;
+  panelRef: React.RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 px-4 py-1.5 text-[13px] transition-colors ${
-        selected ? "bg-white/15 font-semibold" : "hover:bg-white/10"
+    <div
+      className={`absolute bottom-11 right-0 z-50 w-64 origin-bottom-right overflow-hidden rounded-2xl border border-white/15 bg-[#0e0e13]/95 text-white shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl transition-all duration-200 ease-out ${
+        open
+          ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+          : "pointer-events-none translate-y-3 scale-95 opacity-0"
       }`}
+      aria-hidden={!open}
     >
-      <span
-        className={`grid size-4 shrink-0 place-items-center rounded-full border transition-colors ${
-          selected ? "border-white bg-white text-black" : "border-white/40"
-        }`}
-      >
-        {selected ? <Check className="h-3 w-3" aria-hidden="true" /> : null}
-      </span>
-      <span className="flex-1 text-left">{label}</span>
-      {badge ? (
-        <span className="rounded bg-white/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wide">{badge}</span>
-      ) : null}
-    </button>
+      {/* Header Bar */}
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-4 py-2.5">
+        {view === "root" ? (
+          <div className="flex items-center gap-2">
+            <Sliders className="h-4 w-4 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-wider text-white">Playback Settings</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setView("root")}
+            className="flex items-center gap-1.5 text-xs font-semibold text-white/90 transition-colors hover:text-white"
+          >
+            <ChevronLeft className="h-4 w-4 text-primary" />
+            <span>{view === "quality" ? "Quality" : "Playback Speed"}</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid size-6 place-items-center rounded-full bg-white/5 text-white/60 transition-colors hover:bg-white/15 hover:text-white"
+          aria-label="Close settings"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Body Views */}
+      <div ref={panelRef} className="p-1.5 hide-scrollbar max-h-[min(16rem,50vh)] overflow-y-auto">
+        {view === "root" && (
+          <div key="root-menu" className="space-y-0.5 animate-fade-in">
+            {/* Quality Row */}
+            <button
+              type="button"
+              onClick={() => setView("quality")}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5">
+                <Film className="h-4 w-4 text-white/70" />
+                <span>Quality</span>
+              </div>
+              <div className="flex items-center gap-1 text-white/60 font-semibold">
+                <span className="truncate max-w-[90px]">{QUALITY_LABELS[quality] ?? quality}</span>
+                {HD_QUALITIES.has(quality) && (
+                  <span className="rounded bg-primary/30 px-1 py-0.2 text-[9px] font-bold text-primary-foreground">
+                    HD
+                  </span>
+                )}
+                <ChevronRight className="h-3.5 w-3.5 text-white/40" />
+              </div>
+            </button>
+
+            {/* Speed Row */}
+            <button
+              type="button"
+              onClick={() => setView("speed")}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5">
+                <Zap className="h-4 w-4 text-white/70" />
+                <span>Speed</span>
+              </div>
+              <div className="flex items-center gap-1 text-white/60 font-semibold">
+                <span>{RATE_LABELS[rate] ?? `${rate}×`}</span>
+                <ChevronRight className="h-3.5 w-3.5 text-white/40" />
+              </div>
+            </button>
+          </div>
+        )}
+
+        {view === "quality" && (
+          <div key="quality-menu" className="space-y-0.5 animate-fade-in">
+            {qualityList.map((level) => {
+              const isSelected = quality === level;
+              const isHd = HD_QUALITIES.has(level);
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => {
+                    applyQuality(level);
+                    onClose();
+                  }}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                    isSelected
+                      ? "bg-primary/25 text-white font-semibold ring-1 ring-primary/60"
+                      : "text-white/85 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid size-4 place-items-center">
+                      {isSelected ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                    </span>
+                    <span>{QUALITY_LABELS[level] ?? level}</span>
+                  </div>
+                  {isHd ? (
+                    <span className="rounded bg-primary/30 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-primary-foreground">
+                      HD
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {view === "speed" && (
+          <div key="speed-menu" className="space-y-0.5 animate-fade-in">
+            {rates.map((value) => {
+              const isSelected = rate === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    applyRate(value);
+                    onClose();
+                  }}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                    isSelected
+                      ? "bg-primary/25 text-white font-semibold ring-1 ring-primary/60"
+                      : "text-white/85 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid size-4 place-items-center">
+                      {isSelected ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                    </span>
+                    <span>{RATE_LABELS[value] ?? `${value}×`}</span>
+                  </div>
+                  {value === 1 ? (
+                    <span className="text-[10px] font-medium text-white/40">Normal</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
