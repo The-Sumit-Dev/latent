@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  ExternalLink,
   Film,
   Loader2,
   Maximize,
@@ -490,16 +491,35 @@ export function EpisodePlayer({
     await shellRef.current?.requestFullscreen?.().catch(() => {});
   };
 
+  const settingsContainerRef = useRef<HTMLDivElement>(null);
+
   const openSettings = () => {
     setSettingsOpen((open) => !open);
     setSettingsView("root");
     revealControls();
   };
 
-  const closeSettings = () => {
+  const closeSettings = useCallback(() => {
     setSettingsOpen(false);
     window.setTimeout(() => setSettingsView("root"), 220);
-  };
+  }, []);
+
+  // Click-outside listener to dismiss settings popup when tapping anywhere on screen
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const handleGlobalClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (settingsContainerRef.current && !settingsContainerRef.current.contains(target)) {
+        closeSettings();
+      }
+    };
+    window.addEventListener("mousedown", handleGlobalClick);
+    window.addEventListener("touchstart", handleGlobalClick);
+    return () => {
+      window.removeEventListener("mousedown", handleGlobalClick);
+      window.removeEventListener("touchstart", handleGlobalClick);
+    };
+  }, [settingsOpen, closeSettings]);
 
   const savedTimeRef = useRef<number | null>(null);
   const downloadAbortRef = useRef<AbortController | null>(null);
@@ -517,7 +537,9 @@ export function EpisodePlayer({
     setTimeout(() => setIsFetchingLink(false), 200);
   };
 
-  const handleCopyLink = async () => {
+  const [copiedStreamUrl, setCopiedStreamUrl] = useState<string>("");
+
+  const handleCopyAndOpenLink = async () => {
     setIsFetchingLink(true);
     let targetStream = okStreams.find((s) => s.type === selectedQuality || s.type === QUALITY_LABELS[selectedQuality]) ?? okStreams[0];
     let streamUrl = targetStream?.url || currentStreamUrl;
@@ -542,14 +564,18 @@ export function EpisodePlayer({
       return;
     }
 
+    setCopiedStreamUrl(streamUrl);
+
     try {
       await navigator.clipboard.writeText(streamUrl);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
     } catch (err) {
       console.error("Failed to copy stream link:", err);
-      alert("Stream URL: " + streamUrl);
     }
+
+    setCopiedLink(true);
+
+    // Open video stream link in another tab to download video
+    window.open(streamUrl, "_blank", "noopener,noreferrer");
   };
 
   const applyQuality = (level: string) => {
@@ -865,7 +891,7 @@ export function EpisodePlayer({
                   </span>
                 </div>
 
-                <div className="relative flex items-center gap-1 sm:gap-2">
+                <div ref={settingsContainerRef} className="relative flex items-center gap-1 sm:gap-2">
                   <ShakaSettingsMenu
                     open={settingsOpen}
                     view={settingsView}
@@ -987,12 +1013,12 @@ export function EpisodePlayer({
               </div>
             </div>
 
-            {/* Single Copy Link Button (no download or cancel buttons) */}
+            {/* Single Copy Link & Open to Download Button */}
             <button
               type="button"
               disabled={isFetchingLink}
-              onClick={handleCopyLink}
-              className="relative mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-white px-5 font-bold text-black shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:opacity-75"
+              onClick={handleCopyAndOpenLink}
+              className="relative mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black shadow-lg transition-all hover:brightness-110 active:scale-95 disabled:opacity-75"
             >
               {isFetchingLink ? (
                 <span className="flex items-center gap-2 text-sm font-bold text-black">
@@ -1000,14 +1026,14 @@ export function EpisodePlayer({
                   Fetching link...
                 </span>
               ) : copiedLink ? (
-                <span className="flex items-center gap-2 text-sm font-bold text-emerald-700">
-                  <Check className="h-4 w-4 text-emerald-600" />
-                  Copied Link!
+                <span className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-800">
+                  <ExternalLink className="h-4 w-4 text-emerald-700 shrink-0" />
+                  <span>Open Link to Download Video ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-2 text-sm font-bold text-black">
-                  <Copy className="h-4 w-4 text-black" />
-                  Copy Link ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})
+                <span className="flex items-center gap-2 text-xs sm:text-sm font-bold text-black">
+                  <Copy className="h-4 w-4 text-black shrink-0" />
+                  <span>Copy Link & Open to Download ({QUALITY_LABELS[selectedQuality] ?? selectedQuality})</span>
                 </span>
               )}
             </button>
@@ -1092,7 +1118,7 @@ function ShakaSettingsMenu({
 }) {
   return (
     <div
-      className={`absolute bottom-11 right-0 z-50 w-64 origin-bottom-right overflow-hidden rounded-2xl border border-white/15 bg-[#0e0e13]/95 text-white shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-xl transition-all duration-200 ease-out ${
+      className={`absolute bottom-11 right-0 z-50 w-[190px] sm:w-52 max-w-[calc(100vw-2rem)] origin-bottom-right overflow-hidden rounded-2xl border border-white/15 bg-[#0e0e13]/95 text-white shadow-[0_16px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl transition-all duration-200 ease-out ${
         open
           ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
           : "pointer-events-none translate-y-3 scale-95 opacity-0"
@@ -1100,54 +1126,54 @@ function ShakaSettingsMenu({
       aria-hidden={!open}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-4 py-2.5">
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] sm:text-xs">
         {view === "root" ? (
-          <div className="flex items-center gap-2">
-            <Sliders className="h-4 w-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-wider text-white">Playback Settings</span>
+          <div className="flex items-center gap-1.5">
+            <Sliders className="h-3.5 w-3.5 text-primary" />
+            <span className="font-bold uppercase tracking-wider text-white">Settings</span>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setView("root")}
-            className="flex items-center gap-1.5 text-xs font-semibold text-white/90 transition-colors hover:text-white"
+            className="flex items-center gap-1 font-semibold text-white/90 transition-colors hover:text-white"
           >
-            <ChevronLeft className="h-4 w-4 text-primary" />
-            <span>{view === "quality" ? "Quality" : "Playback Speed"}</span>
+            <ChevronLeft className="h-3.5 w-3.5 text-primary" />
+            <span className="truncate">{view === "quality" ? "Quality" : "Speed"}</span>
           </button>
         )}
         <button
           type="button"
           onClick={onClose}
-          className="grid size-6 place-items-center rounded-full bg-white/5 text-white/60 transition-colors hover:bg-white/15 hover:text-white"
+          className="grid size-5 place-items-center rounded-full bg-white/5 text-white/60 transition-colors hover:bg-white/15 hover:text-white"
           aria-label="Close settings"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-3 w-3" />
         </button>
       </div>
 
       {/* Body Views */}
-      <div ref={panelRef} className="p-1.5 hide-scrollbar max-h-[min(16rem,50vh)] overflow-y-auto">
+      <div ref={panelRef} className="p-1 hide-scrollbar max-h-[min(13rem,42vh)] overflow-y-auto">
         {view === "root" && (
           <div key="root-menu" className="space-y-0.5 animate-fade-in">
             {/* Quality Row */}
             <button
               type="button"
               onClick={() => setView("quality")}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[11px] sm:text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2.5">
-                <Film className="h-4 w-4 text-white/70" />
+              <div className="flex items-center gap-2">
+                <Film className="h-3.5 w-3.5 text-white/70" />
                 <span>Quality</span>
               </div>
               <div className="flex items-center gap-1 text-white/60 font-semibold">
-                <span className="truncate max-w-[90px]">{QUALITY_LABELS[quality] ?? quality}</span>
+                <span className="truncate max-w-[70px]">{QUALITY_LABELS[quality] ?? quality}</span>
                 {HD_QUALITIES.has(quality) && (
-                  <span className="rounded bg-primary/30 px-1 py-0.2 text-[9px] font-bold text-primary-foreground">
+                  <span className="rounded bg-primary/30 px-1 py-0.2 text-[8px] font-bold text-primary-foreground">
                     HD
                   </span>
                 )}
-                <ChevronRight className="h-3.5 w-3.5 text-white/40" />
+                <ChevronRight className="h-3 w-3 text-white/40" />
               </div>
             </button>
 
@@ -1155,15 +1181,15 @@ function ShakaSettingsMenu({
             <button
               type="button"
               onClick={() => setView("speed")}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
+              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[11px] sm:text-xs font-medium text-white transition-all hover:bg-white/10 active:scale-[0.98]"
             >
-              <div className="flex items-center gap-2.5">
-                <Zap className="h-4 w-4 text-white/70" />
+              <div className="flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5 text-white/70" />
                 <span>Speed</span>
               </div>
               <div className="flex items-center gap-1 text-white/60 font-semibold">
                 <span>{RATE_LABELS[rate] ?? `${rate}×`}</span>
-                <ChevronRight className="h-3.5 w-3.5 text-white/40" />
+                <ChevronRight className="h-3 w-3 text-white/40" />
               </div>
             </button>
           </div>
@@ -1182,20 +1208,20 @@ function ShakaSettingsMenu({
                     applyQuality(level);
                     onClose();
                   }}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                  className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-[11px] sm:text-xs font-medium transition-all ${
                     isSelected
                       ? "bg-primary/25 text-white font-semibold ring-1 ring-primary/60"
                       : "text-white/85 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid size-4 place-items-center">
-                      {isSelected ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                  <div className="flex items-center gap-2">
+                    <span className="grid size-3.5 place-items-center">
+                      {isSelected ? <Check className="h-3 w-3 text-primary" /> : null}
                     </span>
                     <span>{QUALITY_LABELS[level] ?? level}</span>
                   </div>
                   {isHd ? (
-                    <span className="rounded bg-primary/30 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-primary-foreground">
+                    <span className="rounded bg-primary/30 px-1 py-0.2 text-[8px] font-bold tracking-wider text-primary-foreground">
                       HD
                     </span>
                   ) : null}
@@ -1217,20 +1243,20 @@ function ShakaSettingsMenu({
                     applyRate(value);
                     onClose();
                   }}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                  className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-[11px] sm:text-xs font-medium transition-all ${
                     isSelected
                       ? "bg-primary/25 text-white font-semibold ring-1 ring-primary/60"
                       : "text-white/85 hover:bg-white/10 hover:text-white"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid size-4 place-items-center">
-                      {isSelected ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                  <div className="flex items-center gap-2">
+                    <span className="grid size-3.5 place-items-center">
+                      {isSelected ? <Check className="h-3 w-3 text-primary" /> : null}
                     </span>
                     <span>{RATE_LABELS[value] ?? `${value}×`}</span>
                   </div>
                   {value === 1 ? (
-                    <span className="text-[10px] font-medium text-white/40">Normal</span>
+                    <span className="text-[9px] font-medium text-white/40">Normal</span>
                   ) : null}
                 </button>
               );
